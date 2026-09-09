@@ -176,7 +176,13 @@ function bindUIEvents() {
   if (btnMinimize) btnMinimize.addEventListener("click", () => window.electronAPI.minimize());
   if (btnClose) btnClose.addEventListener("click", () => window.electronAPI.close());
 
-
+  window.addEventListener("shiro-settings-changed", async (event) => {
+    const nextSettings = event.detail?.settings || SettingsPanel.getSettings();
+    if (AppState.currentScreen === "live") {
+      AppState.activeSettings = nextSettings;
+      await applyLiveStreamSettings(nextSettings);
+    }
+  });
 
   // ── Start Stream ──
   const btnStartStream = document.getElementById("btnStartStream");
