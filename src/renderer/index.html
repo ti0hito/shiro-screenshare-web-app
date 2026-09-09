@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src *; img-src 'self' data: file: https://cdn.discordapp.com;" />
+  <title>Shiro Screen Share</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ══ Custom Titlebar ══ -->
+  <div id="titlebar">
+    <div class="titlebar-drag">
+      <div class="titlebar-brand">
+        <img src="../icon.ico" alt="Shiro" class="titlebar-icon" />
+        <span class="titlebar-title">Shiro Screen Share</span>
+        <span class="titlebar-version" id="appVersion"></span>
+      </div>
+    </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="btnMinimize" title="Minimizar">
+        <svg width="12" height="12" viewBox="0 0 12 12"><rect y="5" width="12" height="2" rx="1" fill="currentColor"/></svg>
+      </button>
+      <button class="titlebar-btn titlebar-close" id="btnClose" title="Fechar">
+        <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ Main App Container ══ -->
+  <div id="app">
+
+    <!-- ── Idle Screen (waiting for deep link or manual) ── -->
+    <div id="screen-idle" class="screen active">
+      <div class="idle-container">
+        <div class="idle-logo-wrapper">
+          <img src="../../icon.ico" alt="Shiro" class="idle-logo" />
+          <div class="idle-logo-glow"></div>
+        </div>
+        <h1 class="idle-title">Shiro Screen Share</h1>
+        <p class="idle-subtitle">Compartilhe sua tela com qualidade máxima para a atividade do Discord</p>
+
+        <div class="idle-status" id="idleStatus">
+          <div class="idle-pulse"></div>
+          <span>Esperando conexão do Discord...</span>
+        </div>
+
+        <div class="idle-divider">
+          <span>nome de exibição</span>
+        </div>
+
+        <div class="manual-form" id="manualForm">
+          <div class="form-group">
+            <label for="inputUserName">Seu Nome</label>
+            <input type="text" id="inputUserName" placeholder="Como você quer aparecer" />
+          </div>
+          <p class="idle-hint">O nome será usado ao conectar via Discord. Se vazio, será usado seu nome do Discord.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Source Picker Screen ── -->
+    <div id="screen-source" class="screen">
+      <div class="source-container">
+        <div class="source-header">
+          <h2 class="source-title">Selecione o que compartilhar</h2>
+          <p class="source-room-info" id="sourceRoomInfo"></p>
+        </div>
+
+        <div class="source-tabs">
+          <button class="source-tab active" data-tab="screen">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Telas
+          </button>
+          <button class="source-tab" data-tab="window">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="10" cy="6" r="1" fill="currentColor"/></svg>
+            Janelas
+          </button>
+        </div>
+
+        <div class="source-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="sourceSearch" placeholder="Buscar por nome..." />
+        </div>
+
+        <div class="source-grid" id="sourceGrid">
+          <div class="source-loading">
+            <div class="loading-spinner"></div>
+            <span>Carregando fontes...</span>
+          </div>
+        </div>
+
+        <div class="source-audio-section">
+          <div class="audio-toggle-row">
+            <div class="audio-toggle-info">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+              <div>
+                <span class="audio-label">Capturar Áudio do Sistema</span>
+                <span class="audio-desc">Transmitir sons do computador junto com o vídeo (estilo Discord)</span>
+              </div>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="audioToggle" checked />
+              <label for="audioToggle" class="toggle-slider"></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="source-footer">
+          <button class="btn-secondary" id="btnSettings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            Configurações
+          </button>
+          <button class="btn-primary btn-start" id="btnStartStream" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Iniciar Transmissão
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Settings Overlay ── -->
+      <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-panel" id="settingsPanel">
+          <!-- Populated by settings-panel.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Connecting Screen ── -->
+    <div id="screen-connecting" class="screen">
+      <div class="connecting-container">
+        <div class="loading-spinner large"></div>
+        <h2>Conectando ao servidor...</h2>
+        <p class="connecting-desc">Estabelecendo conexão com o LiveKit</p>
+      </div>
+    </div>
+
+    <!-- ── Live Screen ── -->
+    <div id="screen-live" class="screen">
+      <!-- Populated by live-view.js -->
+    </div>
+
+    <!-- ── Error Screen ── -->
+    <div id="screen-error" class="screen">
+      <div class="error-container">
+        <div class="error-icon-wrap">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <h2 class="error-title">Algo deu errado</h2>
+        <p class="error-desc" id="errorMessage">Erro desconhecido</p>
+        <button class="btn-primary" id="btnRetry">Tentar novamente</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="source-picker.js"></script>
+  <script src="settings-panel.js"></script>
+  <script src="live-view.js"></script>
+  <script src="renderer-init.js"></script>
+  <script src="app.bundle.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "name": "shiro-screen-share",
+  "version": "1.0.0",
+  "description": "Shiro Screen Share — App desktop para capturar e transmitir tela para a atividade Discord",
+  "main": "src/main/main.js",
+  "author": "Hito",
+  "license": "MIT",
+  "scripts": {
+    "clean": "node -e \"const { spawnSync } = require('child_process'); const fs = require('fs'); const target = 'dist'; if (process.platform === 'win32') { for (const proc of ['electron.exe', 'app-builder.exe']) { spawnSync('taskkill', ['/F', '/IM', proc, '/T'], { stdio: 'ignore' }); } } (async () => { for (let i = 0; i < 30; i++) { try { if (fs.existsSync(target)) { fs.rmSync(target, { recursive: true, force: true }); } if (!fs.existsSync(target)) { console.log('cleaned dist'); return; } } catch (err) { if (err.code !== 'EBUSY' && err.code !== 'EPERM') { throw err; } } await new Promise((resolve) => setTimeout(resolve, 250 + i * 250)); } throw new Error('Could not remove dist folder. Close any Electron or file explorer windows using the build output and try again.'); })().catch((err) => { console.error(err.message); process.exit(1); });\"",
+    "build:renderer": "esbuild src/renderer/app.js --bundle --platform=browser --outfile=src/renderer/app.bundle.js --external:electron --format=iife --target=chrome120",
+    "dev": "npm run build:renderer && .\\node_modules\\electron\\dist\\electron.exe .",
+    "build": "npm run clean && npm run build:renderer && electron-builder",
+    "pack": "npm run clean && npm run build:renderer && electron-builder --dir"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "koffi": "^3.2.1",
+    "livekit-client": "^2.22.2",
+    "loopback-capture": "^3.0.2"
+  },
+  "devDependencies": {
+    "electron": "^33.4.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.2",
+    "sharp": "^0.35.4"
+  },
+  "build": {
+    "extends": "electron-builder.yml"
+  }
+}

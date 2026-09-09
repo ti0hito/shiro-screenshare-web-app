@@ -1,0 +1,43 @@
+appId: com.shiro.screenshare
+productName: Shiro Screen Share
+copyright: Copyright © 2026 Nekomura
+
+directories:
+  output: dist
+
+files:
+  - src/**/*
+  - "!src/**/*.map"
+  - "!src/renderer/app.js"
+  - node_modules/**/*
+  - "!backend/**/*"
+
+extraResources:
+  - from: icon.ico
+    to: .
+
+win:
+  icon: icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  signingHashAlgorithms: []
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: icon.ico
+  uninstallerIcon: icon.ico
+
+protocols:
+  - name: Shiro Screen Share
+    schemes:
+      - shiro
+
+# Disable code signing for development builds
+afterSign: null

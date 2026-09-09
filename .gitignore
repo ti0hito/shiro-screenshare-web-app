@@ -1,0 +1,19 @@
+node_modules/
+dist/
+out/
+build/
+*.exe
+*.dmg
+*.AppImage
+*.snap
+.env.local
+.env.production
+.env
+backend/
+scripts/
+
+# esbuild bundle (regenerated on build)
+src/renderer/app.bundle.js
+
+# Backend secrets
+backend/.env
