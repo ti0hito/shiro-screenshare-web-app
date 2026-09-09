@@ -33,6 +33,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   installerIcon: icon.ico
   uninstallerIcon: icon.ico
+  uninstallDisplayName: Shiro Screen Share
+
+publish:
+  provider: github
 
 protocols:
   - name: Shiro Screen Share

@@ -1,6 +1,6 @@
 {
   "name": "shiro-screen-share",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Shiro Screen Share — App desktop para capturar e transmitir tela para a atividade Discord",
   "main": "src/main/main.js",
   "author": "Hito",
@@ -10,10 +10,12 @@
     "build:renderer": "esbuild src/renderer/app.js --bundle --platform=browser --outfile=src/renderer/app.bundle.js --external:electron --format=iife --target=chrome120",
     "dev": "npm run build:renderer && .\\node_modules\\electron\\dist\\electron.exe .",
     "build": "npm run clean && npm run build:renderer && electron-builder",
+    "build:release": "npm run clean && npm run build:renderer && electron-builder --publish always",
     "pack": "npm run clean && npm run build:renderer && electron-builder --dir"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "electron-updater": "^6.3.9",
     "koffi": "^3.2.1",
     "livekit-client": "^2.22.2",
     "loopback-capture": "^3.0.2"

@@ -1,9 +1,32 @@
 const path = require("path");
+let app = null;
+let BrowserWindow, ipcMain, desktopCapturer, protocol, shell, Tray, Menu;
+let autoUpdater = null;
+let tray = null;
+
+function resolveEnvPath() {
+  const appPath = app && app.getAppPath ? app.getAppPath() : __dirname;
+  const candidates = [
+    path.join(__dirname, "..", "..", ".env"),
+    path.join(process.resourcesPath || "", ".env"),
+    path.join(appPath, ".env"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (candidate && require("fs").existsSync(candidate)) {
+        return candidate;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  return path.join(__dirname, "..", "..", ".env");
+}
 
 // ── Load .env ──
-require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
-
-let app, BrowserWindow, ipcMain, desktopCapturer, protocol, shell;
+require("dotenv").config({ path: resolveEnvPath() });
 
 try {
   const electron = require("electron");
@@ -13,11 +36,19 @@ try {
   desktopCapturer = electron.desktopCapturer;
   protocol = electron.protocol;
   shell = electron.shell;
+  Tray = electron.Tray;
+  Menu = electron.Menu;
   // Expose nativeImage for icon handling
   nativeImage = electron.nativeImage;
 } catch (e) {
   console.error("Failed to load Electron:", e.message);
   process.exit(1);
+}
+
+try {
+  autoUpdater = require("electron-updater").autoUpdater;
+} catch (e) {
+  console.warn("electron-updater unavailable:", e.message);
 }
 
 // Expose a simple IPC to give renderer the resources path
@@ -85,6 +116,64 @@ if (app && app.setAsDefaultProtocolClient) {
 
 let mainWindow = null;
 let pendingDeepLink = null;
+let appShouldQuit = false;
+
+function restoreWindowFromTray() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (!app || !Tray || !Menu || process.platform !== "win32") {
+    return;
+  }
+
+  if (tray) {
+    return;
+  }
+
+  const trayIconPath = app.isPackaged
+    ? path.join(process.resourcesPath, "icon.ico")
+    : path.join(__dirname, "..", "..", "icon.ico");
+
+  tray = new Tray(trayIconPath);
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: "Abrir",
+      click: () => restoreWindowFromTray(),
+    },
+    {
+      label: "Fechar para bandeja",
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.hide();
+        }
+      },
+    },
+    {
+      label: "Sair",
+      click: () => {
+        appShouldQuit = true;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.close();
+        } else {
+          app.quit();
+        }
+      },
+    },
+  ]);
+
+  tray.setToolTip("Shiro Screen Share");
+  tray.setContextMenu(contextMenu);
+
+  tray.on("click", () => restoreWindowFromTray());
+}
 
 // Ensure Windows uses the correct AppUserModelID so taskbar groups and icons are correct
 try {
@@ -219,6 +308,8 @@ function createWindow() {
   console.log("[Shiro] Loading HTML file...");
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
 
+  createTray();
+
   mainWindow.once("ready-to-show", () => {
     console.log("[Shiro] Window ready to show");
     mainWindow.show();
@@ -230,9 +321,27 @@ function createWindow() {
     }
   });
 
+  mainWindow.on("minimize", (event) => {
+    if (process.platform === "win32" && tray) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
+  mainWindow.on("close", (event) => {
+    if (process.platform === "win32" && tray && !appShouldQuit) {
+      event.preventDefault();
+      mainWindow.hide();
+      return;
+    }
+  });
+
   mainWindow.on("closed", () => {
     console.log("[Shiro] Window closed");
     mainWindow = null;
+    if (appShouldQuit && app && app.quit) {
+      app.quit();
+    }
   });
 
   // Open external links in default browser
@@ -244,7 +353,81 @@ function createWindow() {
   console.log("[Shiro] Window created successfully");
 }
 
+function configureAutoUpdater() {
+  if (!autoUpdater || !app || !app.isPackaged) {
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    console.log("[Updater] Verificando atualizações...");
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    console.log("[Updater] Atualização disponível:", info && info.version ? info.version : "unknown");
+  });
+
+  autoUpdater.on("update-not-available", (info) => {
+    console.log("[Updater] Nenhuma atualização disponível.", info);
+  });
+
+  autoUpdater.on("download-progress", (progressObj) => {
+    const percent = progressObj && typeof progressObj.percent === "number" ? progressObj.percent.toFixed(1) : "0";
+    console.log("[Updater] Download em progresso:", `${percent}%`);
+  });
+
+  autoUpdater.on("error", (error) => {
+    console.error("[Updater] Erro ao atualizar:", error && error.message ? error.message : error);
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    console.log("[Updater] Atualização concluída. A instalação será feita ao reiniciar.");
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("update-downloaded");
+    }
+  });
+}
+
+async function checkForUpdates() {
+  if (!autoUpdater || !app || !app.isPackaged) {
+    return { enabled: false, reason: "not-packaged" };
+  }
+
+  try {
+    const result = await autoUpdater.checkForUpdatesAndNotify();
+    return { enabled: true, result };
+  } catch (error) {
+    console.error("[Updater] Falha no checkForUpdatesAndNotify:", error);
+    return { enabled: true, error: error && error.message ? error.message : String(error) };
+  }
+}
+
 // ── IPC Handlers ──
+
+if (ipcMain && ipcMain.handle) {
+  try {
+    ipcMain.handle("check-for-updates", async () => {
+      return checkForUpdates();
+    });
+
+    ipcMain.handle("install-update", async () => {
+      if (!autoUpdater || !app || !app.isPackaged) {
+        return { installed: false, reason: "not-packaged" };
+      }
+
+      try {
+        autoUpdater.quitAndInstall(false, true);
+        return { installed: true };
+      } catch (error) {
+        return { installed: false, error: error && error.message ? error.message : String(error) };
+      }
+    });
+  } catch (e) {
+    console.log("IPC update handlers not available:", e.message);
+  }
+}
 
 // Get desktop sources (screens + windows)
 if (ipcMain && ipcMain.handle && desktopCapturer) {
@@ -280,11 +463,26 @@ if (ipcMain && ipcMain.handle && desktopCapturer) {
 if (ipcMain && ipcMain.on) {
   try {
     ipcMain.on("window-minimize", () => {
-      if (mainWindow) mainWindow.minimize();
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+
+      if (process.platform === "win32" && tray) {
+        mainWindow.hide();
+        return;
+      }
+
+      mainWindow.minimize();
     });
 
     ipcMain.on("window-close", () => {
-      if (mainWindow) mainWindow.close();
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+
+      if (process.platform === "win32" && tray) {
+        appShouldQuit = false;
+        mainWindow.hide();
+        return;
+      }
+
+      mainWindow.close();
     });
   } catch (e) {
     console.log("IPC window controls not available:", e.message);
@@ -658,7 +856,7 @@ if (ipcMain && ipcMain.handle) {
   try {
     ipcMain.handle("get-config", () => {
       return {
-        backendUrl: process.env.BACKEND_URL || "http://localhost:3001",
+        backendUrl: process.env.BACKEND_URL || "https://shiro-webapp-backend.vercel.app/",
         livekitUrl: process.env.LIVEKIT_URL || "wss://livekit.shirobot.xyz",
       };
     });
@@ -671,7 +869,14 @@ if (ipcMain && ipcMain.handle) {
 if (app && app.whenReady) {
   try {
     app.whenReady().then(() => {
+      configureAutoUpdater();
       createWindow();
+
+      setTimeout(() => {
+        if (app && app.isPackaged) {
+          checkForUpdates();
+        }
+      }, 5000);
 
       // Handle deep link from initial argv (cold start on Windows)
       handleArgv(process.argv);

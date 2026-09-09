@@ -11,6 +11,7 @@ build/
 .env
 backend/
 scripts/
+.github/
 
 # esbuild bundle (regenerated on build)
 src/renderer/app.bundle.js

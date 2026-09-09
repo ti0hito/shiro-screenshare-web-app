@@ -24,7 +24,7 @@ const {
 const AppState = {
   // Config (carregada do main process)
   config: {
-    backendUrl: "http://localhost:3001",
+    backendUrl: "https://shiro-webapp-backend.vercel.app/",
     livekitUrl: "wss://livekit.shirobot.xyz",
   },
 

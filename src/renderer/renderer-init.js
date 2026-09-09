@@ -4,7 +4,7 @@
     const resPath = await window.electronAPI.getResourcesPath();
     if (!resPath) return;
     const normalized = resPath.replace(/\\\\/g, '/');
-    const iconUrl = `file://${normalized}/icon.ico`;
+    const iconUrl = `file:///${normalized}/icon.ico`;
 
     function applyIcon(img) {
       try {
