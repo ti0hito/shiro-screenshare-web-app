@@ -38,7 +38,8 @@ const AppState = {
   keyframeInterval: null,
   previousBytesSent: 0,
   previousStatsTime: 0,
-
+  activeVideoSender: null,
+  activeSettings: null,
 
 
   // Dados da conexão
@@ -70,7 +71,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Ouvir deep links
   bindDeepLink();
 
+  window.addEventListener("shiro-settings-changed", (event) => {
+    const nextSettings = event.detail?.settings || SettingsPanel.getSettings();
+    AppState.activeSettings = nextSettings;
 
+    if (AppState.currentScreen === "live") {
+      applyLiveStreamSettings(nextSettings);
+    }
+  });
 
   console.log("[Shiro] App pronto. Esperando conexão...");
 });
@@ -341,6 +349,60 @@ async function fetchToken(backendUrl, data) {
  * @param {boolean} audioEnabled - Se deve capturar áudio do sistema
  * @returns {Promise<MediaStream>}
  */
+async function validateCapturedFrame(stream, { minNonBlackRatio = 0.04, minBrightness = 18 } = {}) {
+  const videoTrack = stream?.getVideoTracks?.()[0];
+  if (!videoTrack) return;
+
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.srcObject = stream;
+  video.style.display = "none";
+  document.body.appendChild(video);
+
+  try {
+    await video.play().catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, width, height).data;
+
+    let brightPixels = 0;
+    let totalPixels = 0;
+
+    for (let i = 0; i < imageData.length; i += 4) {
+      const r = imageData[i];
+      const g = imageData[i + 1];
+      const b = imageData[i + 2];
+      const luminance = (r * 0.2126) + (g * 0.7152) + (b * 0.0722);
+      totalPixels += 1;
+      if (luminance > minBrightness) {
+        brightPixels += 1;
+      }
+    }
+
+    const nonBlackRatio = totalPixels > 0 ? brightPixels / totalPixels : 0;
+    console.log("[Shiro] Validação da captura: razão de pixels visíveis =", nonBlackRatio.toFixed(4));
+
+    if (nonBlackRatio < minNonBlackRatio) {
+      throw new Error("A captura está vindo preta ou quase sem imagem. Tente outra janela/tela e deixe a fonte visível antes de iniciar a transmissão.");
+    }
+  } finally {
+    video.pause();
+    video.srcObject = null;
+    video.remove();
+  }
+}
+
 async function captureScreen(sourceId, resolution, audioEnabled) {
   console.log("[Shiro] Capturando tela - Fonte:", sourceId, "Áudio:", audioEnabled);
   
@@ -383,7 +445,14 @@ async function captureScreen(sourceId, resolution, audioEnabled) {
     }
     
     console.log("[Shiro] ✅ Captura completa com sucesso");
-    return stream;
+
+    try {
+      await validateCapturedFrame(stream);
+      return stream;
+    } catch (validationErr) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw validationErr;
+    }
     
   } catch (nativeErr) {
     console.error("[Shiro] ❌ Captura falhou:", nativeErr);
@@ -420,6 +489,46 @@ async function captureScreen(sourceId, resolution, audioEnabled) {
  * @param {Object} settings - Settings do painel (codec, bitrate, etc.)
  * @param {Object} resolution - { width, height, frameRate }
  */
+async function applyLiveStreamSettings(settings = AppState.activeSettings || SettingsPanel.getSettings()) {
+  if (!AppState.room || AppState.currentScreen !== "live") return;
+
+  const publications = AppState.room.localParticipant.videoTrackPublications;
+  const pub = publications && publications.size > 0 ? publications.values().next().value : null;
+  const sender = pub?.track?.sender;
+
+  if (!sender || typeof sender.getParameters !== "function") return;
+
+  const targetBitrateKbps = Math.min(Math.max(parseInt(settings.bitrate || "6000", 10) || 6000, 500), 9000);
+  const targetFps = Math.min(Math.max(parseInt(settings.fps || "60", 10) || 60, 15), 60);
+  const targetBitrateBps = targetBitrateKbps * 1000;
+
+  try {
+    const params = sender.getParameters();
+    if (!params || !params.encodings) return;
+
+    params.encodings.forEach((enc) => {
+      enc.maxBitrate = targetBitrateBps;
+      enc.minBitrate = Math.max(500000, Math.floor(targetBitrateBps * 0.5));
+      enc.maxFramerate = targetFps;
+      enc.scaleResolutionDownBy = 1.0;
+      enc.priority = "high";
+      enc.networkPriority = "high";
+    });
+
+    params.degradationPreference = "maintain-resolution";
+    await sender.setParameters(params);
+    AppState.activeVideoSender = sender;
+    AppState.activeSettings = settings;
+
+    console.log("[Shiro] Configuração aplicada em tempo real:", {
+      bitrateKbps: targetBitrateKbps,
+      fps: targetFps,
+    });
+  } catch (err) {
+    console.warn("[Shiro] Não foi possível atualizar a configuração ao vivo:", err);
+  }
+}
+
 async function connectToLiveKit(token, stream, settings, resolution) {
   // Criar room — sem adaptiveStream/dynacast para manter a qualidade exata configurada
   const room = new Room({
@@ -488,6 +597,8 @@ async function connectToLiveKit(token, stream, settings, resolution) {
     };
 
     const pub = await room.localParticipant.publishTrack(localVideo, publishOptions);
+    AppState.activeVideoSender = pub?.track?.sender || null;
+    AppState.activeSettings = settings;
     console.log("[Shiro] Video track publicada (H.264 / NVENC / High Res) ✓");
     
     const minBitrateBps = Math.max(2000000, Math.floor(targetBitrateBps * 0.5));
@@ -603,6 +714,10 @@ async function getStreamStats() {
   const publications = AppState.room.localParticipant.videoTrackPublications;
   if (!publications || publications.size === 0) return null;
 
+  const settings = SettingsPanel.getSettings();
+  const targetBitrate = Number.parseInt(settings.bitrate || "6000", 10) * 1000;
+  const targetFps = Number.parseInt(settings.fps || "60", 10);
+
   // Pegar a primeira publicação de vídeo
   const pub = publications.values().next().value;
   if (!pub || !pub.track) return null;
@@ -657,6 +772,8 @@ async function getStreamStats() {
       fps: framesPerSecond,
       latency: roundTripTime,
       quality,
+      targetBitrate,
+      targetFps,
     };
   } catch {
     return null;

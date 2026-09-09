@@ -1,6 +1,6 @@
 {
   "name": "shiro-screen-share",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Shiro Screen Share — App desktop para capturar e transmitir tela para a atividade Discord",
   "main": "src/main/main.js",
   "author": "Hito",

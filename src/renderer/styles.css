@@ -919,7 +919,8 @@ html, body {
   flex-shrink: 0;
 }
 
-.settings-option select {
+.settings-option select,
+.settings-option input {
   background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border-primary);
@@ -934,8 +935,63 @@ html, body {
   transition: border-color var(--transition-fast);
 }
 
-.settings-option select:focus {
+.settings-option select:focus,
+.settings-option input:focus {
   border-color: var(--accent-primary);
+}
+
+.settings-option-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.settings-option-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-inline-fields {
+  display: none;
+  gap: 8px;
+}
+
+.settings-inline-fields.active {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.settings-inline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.settings-inline-field input,
+.settings-bitrate-input input {
+  width: 100%;
+}
+
+.settings-bitrate-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-bitrate-input span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.settings-help-text {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 /* ── Preset Buttons ── */
@@ -1223,6 +1279,18 @@ html, body {
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+}
+
+.live-stat-quality {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.quality-text {
+  font-size: 12px;
+  font-weight: 700;
 }
 
 /* ── Footer ── */

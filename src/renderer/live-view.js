@@ -58,6 +58,10 @@ const LiveView = (() => {
             <span class="live-stat-value" id="statBitrate">—</span>
           </div>
           <div class="live-stat">
+            <span class="live-stat-label">Meta</span>
+            <span class="live-stat-value" id="statTargetBitrate">—</span>
+          </div>
+          <div class="live-stat">
             <span class="live-stat-label">Resolução</span>
             <span class="live-stat-value" id="statResolution">—</span>
           </div>
@@ -71,8 +75,9 @@ const LiveView = (() => {
           </div>
           <div class="live-stat">
             <span class="live-stat-label">Qualidade</span>
-            <span class="live-stat-value" id="statQuality">
+            <span class="live-stat-value live-stat-quality" id="statQuality">
               <span class="quality-indicator good"></span>
+              <span class="quality-text">Boa</span>
             </span>
           </div>
         </div>
@@ -140,40 +145,43 @@ const LiveView = (() => {
   function updateStats(stats) {
     if (!stats) return;
 
-    // Bitrate
+    const formatBitrate = (value) => {
+      if (value === undefined || value === null || Number.isNaN(value)) return "—";
+      const kbps = value / 1000;
+      if (kbps >= 1000) return (kbps / 1000).toFixed(1) + " Mbps";
+      return Math.round(kbps) + " kbps";
+    };
+
     const bitrateEl = document.getElementById("statBitrate");
     if (bitrateEl && stats.bitrate !== undefined) {
-      const kbps = stats.bitrate / 1000;
-      if (kbps >= 1000) {
-        bitrateEl.textContent = (kbps / 1000).toFixed(1) + " Mbps";
-      } else {
-        bitrateEl.textContent = Math.round(kbps) + " kbps";
-      }
+      bitrateEl.textContent = formatBitrate(stats.bitrate);
     }
 
-    // Resolution
+    const targetBitrateEl = document.getElementById("statTargetBitrate");
+    if (targetBitrateEl && stats.targetBitrate !== undefined) {
+      targetBitrateEl.textContent = formatBitrate(stats.targetBitrate);
+    }
+
     const resEl = document.getElementById("statResolution");
     if (resEl && stats.width && stats.height) {
       resEl.textContent = stats.width + "×" + stats.height;
     }
 
-    // FPS
     const fpsEl = document.getElementById("statFps");
     if (fpsEl && stats.fps !== undefined) {
       fpsEl.textContent = Math.round(stats.fps);
     }
 
-    // Latency
     const latencyEl = document.getElementById("statLatency");
     if (latencyEl && stats.latency !== undefined) {
       latencyEl.textContent = Math.round(stats.latency) + " ms";
     }
 
-    // Quality indicator
     const qualityEl = document.getElementById("statQuality");
     if (qualityEl && stats.quality) {
       const qualityClass = stats.quality === "good" ? "good" : stats.quality === "fair" ? "fair" : "poor";
-      qualityEl.innerHTML = `<span class="quality-indicator ${qualityClass}"></span>`;
+      const qualityText = stats.quality === "good" ? "Boa" : stats.quality === "fair" ? "Média" : "Baixa";
+      qualityEl.innerHTML = `<span class="quality-indicator ${qualityClass}"></span><span class="quality-text">${qualityText}</span>`;
     }
   }
 

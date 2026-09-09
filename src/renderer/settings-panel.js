@@ -52,6 +52,8 @@ const SettingsPanel = (() => {
   let settings = {
     preset: "gamer",
     resolution: "1080",
+    customWidth: "1920",
+    customHeight: "1080",
     fps: "60",
     bitrate: "6000",
     codec: "h264",
@@ -59,6 +61,34 @@ const SettingsPanel = (() => {
     simulcast: false,
     isolateAudio: false,
   };
+
+  function sanitizeNumber(value, fallback, min, max) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    const clamped = Math.min(Math.max(parsed, min), max);
+    return String(clamped);
+  }
+
+  function clampSafeSettings() {
+    settings.fps = sanitizeNumber(settings.fps, "60", 15, 60);
+    settings.bitrate = sanitizeNumber(settings.bitrate, "6000", 500, 9000);
+    settings.customWidth = sanitizeNumber(settings.customWidth, "1920", 480, 3840);
+    settings.customHeight = sanitizeNumber(settings.customHeight, "1080", 360, 2160);
+  }
+
+  function getQualitySummary() {
+    clampSafeSettings();
+    const width = settings.resolution === "custom"
+      ? sanitizeNumber(settings.customWidth, 1920, 480, 3840)
+      : getResolutionConstraint().width;
+    const height = settings.resolution === "custom"
+      ? sanitizeNumber(settings.customHeight, 1080, 360, 2160)
+      : getResolutionConstraint().height;
+    const fps = sanitizeNumber(settings.fps, 60, 15, 60);
+    const bitrate = sanitizeNumber(settings.bitrate, 6000, 500, 9000);
+
+    return `${width}×${height} • ${fps} FPS • ${Number.parseInt(bitrate, 10) / 1000} Mbps`;
+  }
 
   /**
    * Initialize settings panel — load from storage, render UI
@@ -82,6 +112,8 @@ const SettingsPanel = (() => {
     } catch {
       // Use defaults
     }
+
+    clampSafeSettings();
   }
 
   /**
@@ -93,6 +125,12 @@ const SettingsPanel = (() => {
     } catch {
       // Silent fail
     }
+
+    window.dispatchEvent(
+      new CustomEvent("shiro-settings-changed", {
+        detail: { settings: { ...settings } },
+      })
+    );
   }
 
   /**
@@ -134,34 +172,46 @@ const SettingsPanel = (() => {
       <div class="settings-section">
         <div class="settings-section-title">Qualidade de Vídeo</div>
 
-        <div class="settings-option">
-          <label>Resolução</label>
-          <select id="settingRes">
-            <option value="480" ${settings.resolution === "480" ? "selected" : ""}>480p (SD)</option>
-            <option value="720" ${settings.resolution === "720" ? "selected" : ""}>720p (HD)</option>
-            <option value="1080" ${settings.resolution === "1080" ? "selected" : ""}>1080p (Full HD)</option>
-            <option value="1440" ${settings.resolution === "1440" ? "selected" : ""}>1440p (2K)</option>
-          </select>
+        <div class="settings-option settings-option-stack">
+          <div class="settings-option-head">
+            <label>Resolução</label>
+            <select id="settingRes">
+              <option value="480" ${settings.resolution === "480" ? "selected" : ""}>480p (SD)</option>
+              <option value="720" ${settings.resolution === "720" ? "selected" : ""}>720p (HD)</option>
+              <option value="1080" ${settings.resolution === "1080" ? "selected" : ""}>1080p (Full HD)</option>
+              <option value="1440" ${settings.resolution === "1440" ? "selected" : ""}>1440p (2K)</option>
+              <option value="custom" ${settings.resolution === "custom" ? "selected" : ""}>Personalizada</option>
+            </select>
+          </div>
+          <div class="settings-inline-fields ${settings.resolution === "custom" ? "active" : ""}">
+            <div class="settings-inline-field">
+              <span>Largura</span>
+              <input id="settingCustomWidth" type="number" min="480" max="3840" step="10" value="${settings.customWidth || "1920"}" />
+            </div>
+            <div class="settings-inline-field">
+              <span>Altura</span>
+              <input id="settingCustomHeight" type="number" min="360" max="2160" step="10" value="${settings.customHeight || "1080"}" />
+            </div>
+          </div>
         </div>
 
-        <div class="settings-option">
-          <label>Taxa de Quadros</label>
-          <select id="settingFps">
-            <option value="15" ${settings.fps === "15" ? "selected" : ""}>15 FPS (Leve)</option>
-            <option value="30" ${settings.fps === "30" ? "selected" : ""}>30 FPS (Padrão)</option>
-            <option value="60" ${settings.fps === "60" ? "selected" : ""}>60 FPS (Ultra Fluído)</option>
-          </select>
+        <div class="settings-option settings-option-stack">
+          <div class="settings-option-head">
+            <label>Taxa de Quadros</label>
+            <input id="settingFps" type="number" min="15" max="60" step="5" value="${settings.fps || "60"}" />
+          </div>
+          <div class="settings-help-text">Limite fixo: 60 FPS máximo.</div>
         </div>
 
-        <div class="settings-option">
-          <label>Taxa de Bits</label>
-          <select id="settingBitrate">
-            <option value="1500" ${settings.bitrate === "1500" ? "selected" : ""}>1.5 Mbps (Leve)</option>
-            <option value="2500" ${settings.bitrate === "2500" ? "selected" : ""}>2.5 Mbps (Equilibrado)</option>
-            <option value="4000" ${settings.bitrate === "4000" ? "selected" : ""}>4.0 Mbps (Ideal 720p60)</option>
-            <option value="6000" ${settings.bitrate === "6000" ? "selected" : ""}>6.0 Mbps (HD 1080p)</option>
-            <option value="9000" ${settings.bitrate === "9000" ? "selected" : ""}>9.0 Mbps (Nitidez Máxima)</option>
-          </select>
+        <div class="settings-option settings-option-stack">
+          <div class="settings-option-head">
+            <label>Bitrate</label>
+            <div class="settings-bitrate-input">
+              <input id="settingBitrate" type="number" min="500" max="9000" step="250" value="${settings.bitrate || "6000"}" />
+              <span>kbps</span>
+            </div>
+          </div>
+          <div class="settings-help-text">Limite fixo: 9000 kbps máximo. Resumo ativo: ${getQualitySummary()}</div>
         </div>
       </div>
 
@@ -228,14 +278,44 @@ const SettingsPanel = (() => {
     const resEl = document.getElementById("settingRes");
     const fpsEl = document.getElementById("settingFps");
     const bitEl = document.getElementById("settingBitrate");
+    const customWidthEl = document.getElementById("settingCustomWidth");
+    const customHeightEl = document.getElementById("settingCustomHeight");
     const codecEl = document.getElementById("settingCodec");
     const hwEl = document.getElementById("settingHwAccel");
     const simEl = document.getElementById("settingSimulcast");
     const isoEl = document.getElementById("settingIsolateAudio");
 
-    if (resEl) resEl.addEventListener("change", (e) => { settings.resolution = e.target.value; saveToStorage(); });
-    if (fpsEl) fpsEl.addEventListener("change", (e) => { settings.fps = e.target.value; saveToStorage(); });
-    if (bitEl) bitEl.addEventListener("change", (e) => { settings.bitrate = e.target.value; saveToStorage(); });
+    if (resEl) resEl.addEventListener("change", (e) => {
+      settings.resolution = e.target.value;
+      if (settings.resolution !== "custom") {
+        settings.customWidth = String(getResolutionConstraint().width);
+        settings.customHeight = String(getResolutionConstraint().height);
+      }
+      saveToStorage();
+      renderPanel();
+    });
+    if (fpsEl) fpsEl.addEventListener("input", (e) => {
+      settings.fps = sanitizeNumber(e.target.value, "60", 15, 60);
+      saveToStorage();
+      renderPanel();
+    });
+    if (bitEl) bitEl.addEventListener("input", (e) => {
+      settings.bitrate = sanitizeNumber(e.target.value, "6000", 500, 9000);
+      saveToStorage();
+      renderPanel();
+    });
+    if (customWidthEl) customWidthEl.addEventListener("input", (e) => {
+      settings.resolution = "custom";
+      settings.customWidth = sanitizeNumber(e.target.value, "1920", 480, 3840);
+      saveToStorage();
+      renderPanel();
+    });
+    if (customHeightEl) customHeightEl.addEventListener("input", (e) => {
+      settings.resolution = "custom";
+      settings.customHeight = sanitizeNumber(e.target.value, "1080", 360, 2160);
+      saveToStorage();
+      renderPanel();
+    });
     if (codecEl) codecEl.addEventListener("change", (e) => { settings.codec = e.target.value; saveToStorage(); });
     if (hwEl) hwEl.addEventListener("change", (e) => { settings.hwAccel = e.target.checked; saveToStorage(); });
     if (simEl) simEl.addEventListener("change", (e) => { settings.simulcast = e.target.checked; saveToStorage(); });
@@ -296,7 +376,14 @@ const SettingsPanel = (() => {
    * Get resolution constraint
    */
   function getResolutionConstraint() {
+    clampSafeSettings();
     const frameRate = parseInt(settings.fps, 10);
+    if (settings.resolution === "custom") {
+      const width = sanitizeNumber(settings.customWidth, 1920, 480, 3840);
+      const height = sanitizeNumber(settings.customHeight, 1080, 360, 2160);
+      return { width: Number.parseInt(width, 10), height: Number.parseInt(height, 10), frameRate };
+    }
+
     switch (settings.resolution) {
       case "480": return { width: 854, height: 480, frameRate };
       case "720": return { width: 1280, height: 720, frameRate };
