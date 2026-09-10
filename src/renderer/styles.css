@@ -165,7 +165,7 @@ html, body {
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.2s ease;
   overflow-y: auto;
 }
 
@@ -198,7 +198,6 @@ html, body {
   box-shadow: var(--shadow-glow);
   position: relative;
   z-index: 1;
-  animation: logo-float 4s ease-in-out infinite;
 }
 
 .idle-logo-glow {
@@ -206,18 +205,7 @@ html, body {
   inset: -20px;
   border-radius: var(--radius-full);
   background: radial-gradient(circle, rgba(155, 89, 182, 0.2) 0%, transparent 70%);
-  animation: glow-pulse 3s ease-in-out infinite;
   z-index: 0;
-}
-
-@keyframes logo-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.1); }
 }
 
 .idle-title {
@@ -257,18 +245,7 @@ html, body {
   height: 8px;
   border-radius: var(--radius-full);
   background: var(--accent-primary);
-  animation: pulse-dot 1.5s ease-in-out infinite;
   flex-shrink: 0;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
-
-@keyframes status-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .idle-divider {
@@ -297,12 +274,6 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  animation: form-slide-up 0.4s ease;
-}
-
-@keyframes form-slide-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .form-group {
@@ -362,30 +333,12 @@ html, body {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all var(--transition-normal);
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-primary-hover);
   box-shadow: var(--shadow-glow);
-  transform: translateY(-1px);
-}
-
-.btn-primary:hover::before { opacity: 1; }
-
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0);
 }
 
 .btn-primary:disabled {
@@ -437,11 +390,6 @@ html, body {
 .btn-danger:hover {
   background: #c73235;
   box-shadow: 0 4px 20px var(--accent-danger-glow);
-  transform: translateY(-1px);
-}
-
-.btn-danger:active {
-  transform: translateY(0);
 }
 
 /* Source Picker */
@@ -580,16 +528,13 @@ html, body {
   border: 2px solid var(--border-primary);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
   overflow: hidden;
-  animation: source-item-in 0.3s ease backwards;
 }
 
 .source-item:hover {
   border-color: var(--border-hover);
   background: var(--bg-card-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
 }
 
 .source-item.selected {
@@ -600,12 +545,6 @@ html, body {
 
 .source-item.selected .source-item-check {
   opacity: 1;
-  transform: scale(1);
-}
-
-@keyframes source-item-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .source-item-thumb {
@@ -639,8 +578,7 @@ html, body {
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transform: scale(0.5);
-  transition: all var(--transition-normal);
+  transition: opacity var(--transition-fast);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -817,15 +755,13 @@ html, body {
   position: absolute;
   inset: 0;
   background: var(--bg-overlay);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--transition-smooth);
+  transition: opacity var(--transition-fast);
 }
 
 .settings-overlay.active {
@@ -843,12 +779,6 @@ html, body {
   max-height: calc(100% - 48px);
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
-  animation: panel-slide-up 0.3s ease;
-}
-
-@keyframes panel-slide-up {
-  from { opacity: 0; transform: translateY(20px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .settings-title {
@@ -1180,12 +1110,6 @@ html, body {
   height: 6px;
   border-radius: var(--radius-full);
   background: var(--accent-live);
-  animation: live-blink 1.2s ease-in-out infinite;
-}
-
-@keyframes live-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
 }
 
 .live-channel-info {
@@ -1227,7 +1151,7 @@ html, body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  transform: translateZ(0);
+  will-change: transform;
 }
 
 .live-preview-label {
@@ -1242,7 +1166,6 @@ html, body {
   background: rgba(0, 0, 0, 0.5);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  backdrop-filter: blur(4px);
 }
 
 /* ── Stats ── */
@@ -1297,9 +1220,19 @@ html, body {
 .live-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   flex-shrink: 0;
   padding-top: 4px;
+  gap: 20px;
+}
+
+.live-footer .btn-secondary {
+  flex-shrink: 0;
+}
+
+.live-footer .btn-danger {
+  flex: 1;
+  max-width: 300px;
 }
 
 /* Error Screen */
@@ -1315,15 +1248,6 @@ html, body {
 
 .error-icon-wrap {
   color: var(--accent-danger);
-  animation: error-shake 0.5s ease;
-}
-
-@keyframes error-shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-4px); }
-  80% { transform: translateX(4px); }
 }
 
 .error-title {
@@ -1374,32 +1298,12 @@ html, body {
   background: rgba(250, 166, 26, 0.15);
   border: 1px solid rgba(250, 166, 26, 0.4);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  animation: notification-slide-down 0.4s ease;
-}
-
-@keyframes notification-slide-down {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
 }
 
 .audio-fallback-notification.fade-out {
-  animation: notification-fade-out 0.5s ease forwards;
-}
-
-@keyframes notification-fade-out {
-  to {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-10px);
-  }
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .notification-content {

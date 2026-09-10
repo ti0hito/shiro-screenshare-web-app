@@ -54,21 +54,10 @@ const AppState = {
 // Inicialização
 
 document.addEventListener("DOMContentLoaded", async () => {
-  console.log("[Shiro] App inicializando...");
-
-  // Carregar config do main process
   await loadConfig();
-
-  // Exibir versão no titlebar
   loadAppVersion();
-
-  // Inicializar módulos
   SettingsPanel.init();
-
-  // Bind de eventos da UI
   bindUIEvents();
-
-  // Ouvir deep links
   bindDeepLink();
 
   window.addEventListener("shiro-settings-changed", (event) => {
@@ -79,8 +68,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       applyLiveStreamSettings(nextSettings);
     }
   });
-
-  console.log("[Shiro] App pronto. Esperando conexão...");
 });
 
 /**

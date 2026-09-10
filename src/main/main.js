@@ -184,6 +184,15 @@ try {
   if (app && app.name !== "Shiro Screen Share") {
     app.name = "Shiro Screen Share";
   }
+  // Set the app icon for both development and production
+  if (process.platform === "win32" && app) {
+    const iconPath = app.isPackaged
+      ? path.join(process.resourcesPath, "icon.ico")
+      : path.join(__dirname, "..", "..", "icon.ico");
+    if (require("fs").existsSync(iconPath)) {
+      app.setIcon(iconPath);
+    }
+  }
 } catch (e) {
   // non-fatal
 }

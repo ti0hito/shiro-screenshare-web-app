@@ -15,6 +15,8 @@ files:
 extraResources:
   - from: icon.ico
     to: .
+  - from: icon.png
+    to: .
 
 win:
   icon: icon.ico
@@ -22,11 +24,13 @@ win:
     - target: nsis
       arch:
         - x64
-    - target: portable
-      arch:
-        - x64
   signingHashAlgorithms: []
   signAndEditExecutable: false
+  fileAssociations:
+    - ext: shiro
+      name: Shiro Protocol
+      description: Shiro Screen Share Protocol
+      icon: icon.ico
 
 nsis:
   oneClick: false
@@ -34,6 +38,10 @@ nsis:
   installerIcon: icon.ico
   uninstallerIcon: icon.ico
   uninstallDisplayName: Shiro Screen Share
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Shiro Screen Share
+  perMachine: false
 
 publish:
   provider: github

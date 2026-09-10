@@ -1,16 +1,16 @@
 {
   "name": "shiro-screen-share",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Shiro Screen Share — App desktop para capturar e transmitir tela para a atividade Discord",
   "main": "src/main/main.js",
   "author": "Hito",
   "license": "MIT",
   "scripts": {
     "clean": "node -e \"const { spawnSync } = require('child_process'); const fs = require('fs'); const target = 'dist'; if (process.platform === 'win32') { for (const proc of ['electron.exe', 'app-builder.exe']) { spawnSync('taskkill', ['/F', '/IM', proc, '/T'], { stdio: 'ignore' }); } } (async () => { for (let i = 0; i < 30; i++) { try { if (fs.existsSync(target)) { fs.rmSync(target, { recursive: true, force: true }); } if (!fs.existsSync(target)) { console.log('cleaned dist'); return; } } catch (err) { if (err.code !== 'EBUSY' && err.code !== 'EPERM') { throw err; } } await new Promise((resolve) => setTimeout(resolve, 250 + i * 250)); } throw new Error('Could not remove dist folder. Close any Electron or file explorer windows using the build output and try again.'); })().catch((err) => { console.error(err.message); process.exit(1); });\"",
-    "build:renderer": "esbuild src/renderer/app.js --bundle --platform=browser --outfile=src/renderer/app.bundle.js --external:electron --format=iife --target=chrome120",
+    "build:renderer": "esbuild src/renderer/app.js --bundle --platform=browser --outfile=src/renderer/app.bundle.js --external:electron --format=iife --target=chrome120 --minify --tree-shaking=true --drop:console",
     "dev": "npm run build:renderer && .\\node_modules\\electron\\dist\\electron.exe .",
-    "build": "npm run clean && npm run build:renderer && electron-builder",
-    "build:release": "npm run clean && npm run build:renderer && electron-builder --publish always",
+    "build": "npm run clean && npm run build:renderer && electron-builder --win --publish never",
+    "build:release": "npm run clean && npm run build:renderer && electron-builder --win --publish always",
     "pack": "npm run clean && npm run build:renderer && electron-builder --dir"
   },
   "dependencies": {

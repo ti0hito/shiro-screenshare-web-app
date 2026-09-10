@@ -12,6 +12,7 @@ const LiveView = (() => {
   const ICONS = {
     stop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
     signal: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg>',
+    settings: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
   };
 
   /**
@@ -83,6 +84,10 @@ const LiveView = (() => {
         </div>
 
         <div class="live-footer">
+          <button class="btn-secondary" id="btnLiveSettings">
+            ${ICONS.settings}
+            Configurações
+          </button>
           <button class="btn-danger" id="btnStopStream">
             ${ICONS.stop}
             Parar Transmissão
@@ -106,6 +111,16 @@ const LiveView = (() => {
     if (stopBtn) {
       stopBtn.addEventListener("click", () => {
         if (onStopCallback) onStopCallback();
+      });
+    }
+
+    // Bind settings button
+    const settingsBtn = document.getElementById("btnLiveSettings");
+    if (settingsBtn) {
+      settingsBtn.addEventListener("click", () => {
+        if (typeof SettingsPanel !== 'undefined' && SettingsPanel.show) {
+          SettingsPanel.show();
+        }
       });
     }
   }
