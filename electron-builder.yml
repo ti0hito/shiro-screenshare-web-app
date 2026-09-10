@@ -26,11 +26,14 @@ win:
         - x64
   signingHashAlgorithms: []
   signAndEditExecutable: false
+  artifactName: ${productName} Setup ${version}.${ext}
   fileAssociations:
     - ext: shiro
       name: Shiro Protocol
       description: Shiro Screen Share Protocol
       icon: icon.ico
+  asarUnpack:
+    - icon.ico
 
 nsis:
   oneClick: false
