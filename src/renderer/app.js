@@ -36,6 +36,7 @@ const AppState = {
   mediaStream: null,
   statsInterval: null,
   keyframeInterval: null,
+  qualityMaintenanceInterval: null,
   previousBytesSent: 0,
   previousStatsTime: 0,
   activeVideoSender: null,
@@ -66,6 +67,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (AppState.currentScreen === "live") {
       applyLiveStreamSettings(nextSettings);
+    }
+  });
+
+  // Handle visibility changes to maintain streaming quality
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && AppState.currentScreen === "live") {
+      console.log("[Shiro] Page hidden - maintaining stream quality");
+      // Re-apply settings to ensure quality is maintained
+      if (AppState.activeSettings) {
+        applyLiveStreamSettings(AppState.activeSettings);
+      }
     }
   });
 });
@@ -278,6 +290,9 @@ async function handleStartStream() {
 
     // 6. Iniciar monitoramento de stats
     startStatsMonitor();
+
+    // 7. Iniciar manutenção de qualidade (prevenir degradação em background)
+    startQualityMaintenance();
 
     console.log("[Shiro] 🟣 Transmissão ao vivo!");
   } catch (err) {
@@ -522,6 +537,22 @@ async function applyLiveStreamSettings(settings = AppState.activeSettings || Set
   }
 }
 
+/**
+ * Mantém a qualidade do stream em segundo plano
+ * Reaplica configurações periodicamente para evitar degradação
+ */
+function startQualityMaintenance() {
+  if (AppState.qualityMaintenanceInterval) {
+    clearInterval(AppState.qualityMaintenanceInterval);
+  }
+
+  AppState.qualityMaintenanceInterval = setInterval(() => {
+    if (AppState.currentScreen === "live" && AppState.activeSettings) {
+      applyLiveStreamSettings(AppState.activeSettings);
+    }
+  }, 30000); // Reaplica a cada 30 segundos
+}
+
 async function connectToLiveKit(token, stream, settings, resolution) {
   // Criar room — sem adaptiveStream/dynacast para manter a qualidade exata configurada
   const room = new Room({
@@ -534,6 +565,8 @@ async function connectToLiveKit(token, stream, settings, resolution) {
         frameRate: resolution.frameRate,
       },
     },
+    stopLocalVideoOnMute: false,
+    stopLocalAudioOnMute: false,
   });
 
   AppState.room = room;
@@ -786,6 +819,11 @@ function cleanupStream() {
   if (AppState.keyframeInterval) {
     clearInterval(AppState.keyframeInterval);
     AppState.keyframeInterval = null;
+  }
+
+  if (AppState.qualityMaintenanceInterval) {
+    clearInterval(AppState.qualityMaintenanceInterval);
+    AppState.qualityMaintenanceInterval = null;
   }
 
   // Unpublish e fechar tracks do LiveKit

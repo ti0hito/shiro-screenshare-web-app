@@ -1,8 +1,9 @@
 const path = require("path");
 let app = null;
-let BrowserWindow, ipcMain, desktopCapturer, protocol, shell, Tray, Menu;
+let BrowserWindow, ipcMain, desktopCapturer, protocol, shell, Tray, Menu, powerSaveBlocker;
 let autoUpdater = null;
 let tray = null;
+let powerSaveBlockId = null;
 
 function resolveEnvPath() {
   const appPath = app && app.getAppPath ? app.getAppPath() : __dirname;
@@ -38,6 +39,7 @@ try {
   shell = electron.shell;
   Tray = electron.Tray;
   Menu = electron.Menu;
+  powerSaveBlocker = electron.powerSaveBlocker;
   // Expose nativeImage for icon handling
   nativeImage = electron.nativeImage;
 } catch (e) {
@@ -310,6 +312,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
       backgroundThrottling: false,
+      offscreen: false,
     },
     show: false,
   });
@@ -323,6 +326,23 @@ function createWindow() {
     console.log("[Shiro] Window ready to show");
     mainWindow.show();
 
+    // Enable power save blocker to prevent system from throttling
+    if (powerSaveBlocker && !powerSaveBlockId) {
+      powerSaveBlockId = powerSaveBlocker.start('prevent-app-suspension');
+      console.log("[Shiro] Power save blocker enabled");
+    }
+
+    // Set process priority to high for streaming
+    try {
+      if (process.platform === 'win32') {
+        const { execSync } = require('child_process');
+        execSync(`wmic process where ProcessId=${process.pid} CALL setpriority "high priority"`, { stdio: 'ignore' });
+        console.log("[Shiro] Process priority set to high");
+      }
+    } catch (e) {
+      console.log("[Shiro] Could not set process priority:", e.message);
+    }
+
     // Send pending deep link if app was cold-started via protocol
     if (pendingDeepLink) {
       mainWindow.webContents.send("deep-link", pendingDeepLink);
@@ -335,6 +355,8 @@ function createWindow() {
       event.preventDefault();
       mainWindow.hide();
     }
+    // Prevent performance degradation when minimized
+    console.log("[Shiro] Window minimized - maintaining performance");
   });
 
   mainWindow.on("close", (event) => {
@@ -342,6 +364,13 @@ function createWindow() {
       event.preventDefault();
       mainWindow.hide();
       return;
+    }
+    
+    // Cleanup power save blocker
+    if (powerSaveBlockId && powerSaveBlocker) {
+      powerSaveBlocker.stop(powerSaveBlockId);
+      powerSaveBlockId = null;
+      console.log("[Shiro] Power save blocker disabled");
     }
   });
 
