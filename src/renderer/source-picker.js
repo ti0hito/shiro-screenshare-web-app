@@ -15,12 +15,13 @@ const SourcePicker = (() => {
     check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
     monitor: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
     window: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/></svg>',
+    audio: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>',
   };
 
   /**
    * Initialize the source picker — bind events, load sources
    */
-  function init() {
+  async function init() {
     // Tab switching
     const tabs = document.querySelectorAll(".source-tab");
     tabs.forEach((tab) => {
@@ -80,8 +81,10 @@ const SourcePicker = (() => {
     let filtered;
     if (currentTab === "screen") {
       filtered = sources.filter((s) => s.id.startsWith("screen:"));
-    } else {
+    } else if (currentTab === "window") {
       filtered = sources.filter((s) => s.id.startsWith("window:"));
+    } else {
+      filtered = []; // No audio tab anymore
     }
 
     if (searchQuery) {
@@ -155,10 +158,12 @@ const SourcePicker = (() => {
       } else {
         // Create new item
         item = document.createElement("div");
-        item.className = `source-item${source.id === selectedSourceId ? " selected" : ""}`;
+        const isSelected = source.id === selectedSourceId;
+        item.className = `source-item${isSelected ? " selected" : ""}`;
         item.dataset.id = source.id;
         item.style.animationDelay = `${index * 0.04}s`;
 
+        // Video source item
         const appIconHtml = source.appIcon
           ? `<img src="${source.appIcon}" class="source-item-app-icon" alt="" />`
           : `<div class="source-item-app-icon-fallback">${
@@ -204,7 +209,7 @@ const SourcePicker = (() => {
     // Update grid UI
     const items = document.querySelectorAll(".source-item");
     items.forEach((item) => {
-      if (item.dataset.id === selectedSourceId) {
+      if (item.dataset.id === selectedSourceId || item.dataset.id === selectedAudioApp) {
         item.classList.add("selected");
       } else {
         item.classList.remove("selected");
@@ -220,7 +225,14 @@ const SourcePicker = (() => {
   function updateStartButton() {
     const btn = document.getElementById("btnStartStream");
     if (btn) {
+      // Require at least a video source, audio is optional
       btn.disabled = !selectedSourceId;
+      
+      // Update button text
+      btn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Iniciar Transmissão
+      `;
     }
   }
 

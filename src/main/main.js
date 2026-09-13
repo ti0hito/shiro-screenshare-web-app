@@ -1,4 +1,5 @@
 const path = require("path");
+const fetch = require("node-fetch");
 let app = null;
 let BrowserWindow, ipcMain, desktopCapturer, protocol, shell, Tray, Menu, powerSaveBlocker;
 let autoUpdater = null;
@@ -63,28 +64,6 @@ try {
 } catch (e) {
   // non-fatal
 }
-
-/**
- * SISTEMA DE CAPTURA DE ÁUDIO MULTI-CAMADA
- * ========================================
- * Este sistema implementa múltiplas estratégias de captura de áudio
- * para garantir máxima estabilidade e compatibilidade:
- * 
- * 1. PROCESS_LOOPBACK: Captura por processo específico via WASAPI
- *    - Mais preciso para capturar áudio de um app específico
- *    - Requer que o processo tenha áudio ativo
- * 
- * 2. SYSTEM_LOOPBACK: Captura de sistema completo via WASAPI
- *    - Captura todo o áudio do sistema
- *    - Mais estável que captura por processo
- * 
- * 3. NATIVE_BROWSER: Captura nativa do navegador
- *    - Sempre disponível como fallback
- *    - Usa getUserMedia com chromeMediaSource
- * 
- * O sistema testa automaticamente cada método e usa o que funcionar,
- * com fallback automático para o próximo método.
- */
 
 // ── Single Instance Lock ──
 let gotLock = true;
@@ -527,8 +506,7 @@ if (ipcMain && ipcMain.on) {
   }
 }
 
-// ── Multi-Layer Audio Capture System ──
-// Implementa múltiplas camadas de captura para máxima estabilidade
+// ── Audio Capture System ──
 const loopback = require("loopback-capture");
 const koffi = require("koffi");
 const user32 = koffi.load("user32.dll");
@@ -543,7 +521,7 @@ const AUDIO_METHODS = {
   NATIVE_BROWSER: 'native-browser',
   SYSTEM_LOOPBACK: 'system-loopback',
   PROCESS_LOOPBACK: 'process-loopback',
-  VIRTUAL_DEVICE: 'virtual-device'
+  WINDOWS_API: 'windows-api'
 };
 
 function getPidFromHwnd(hwndInt) {
@@ -555,149 +533,6 @@ function getPidFromHwnd(hwndInt) {
   } catch (err) {
     console.error("getPidFromHwnd error:", err);
     return 0;
-  }
-}
-
-async function testAudioSystem() {
-  console.log("[Audio] 🔍 Testando sistema de áudio multi-camada...");
-  
-  const results = {
-    nativeBrowser: true,
-    systemLoopback: false,
-    virtualDevices: [],
-    recommendedMethod: AUDIO_METHODS.NATIVE_BROWSER
-  };
-  
-  try {
-    const testCapture = new loopback.LoopbackCapture();
-    let receivedData = false;
-    
-    await new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        try { testCapture.stop(); } catch (e) {}
-        resolve(false);
-      }, 2000);
-      
-      try {
-        testCapture.startSystemAudio((chunk) => {
-          if (chunk && chunk.length > 0) {
-            receivedData = true;
-            clearTimeout(timeout);
-            try { testCapture.stop(); } catch (e) {}
-            resolve(true);
-          }
-        });
-      } catch (e) {
-        clearTimeout(timeout);
-        resolve(false);
-      }
-    });
-    
-    results.systemLoopback = receivedData;
-    console.log("[Audio]", receivedData ? "✓" : "✗", "WASAPI Loopback:", receivedData ? "funcionando" : "não disponível");
-  } catch (e) {
-    console.log("[Audio] ✗ WASAPI Loopback: erro de teste", e.message);
-    results.systemLoopback = false;
-  }
-  
-  if (results.systemLoopback) {
-    results.recommendedMethod = AUDIO_METHODS.SYSTEM_LOOPBACK;
-    console.log("[Audio] 🎯 Método recomendado: System Loopback (WASAPI)");
-  } else {
-    results.recommendedMethod = AUDIO_METHODS.NATIVE_BROWSER;
-    console.log("[Audio] 🎯 Método recomendado: Native Browser (fallback)");
-  }
-  
-  console.log("[Audio] 🔍 Teste concluído:", results);
-  return results;
-}
-
-if (ipcMain && ipcMain.handle) {
-  try {
-    ipcMain.handle("start-process-audio", async (event, sourceId, mode = "system", targetPid = null) => {
-      try {
-        if (activeLoopbackCapture) {
-          try { activeLoopbackCapture.stop(); } catch (e) {}
-          activeLoopbackCapture = null;
-        }
-
-        audioCaptureMethod = null;
-        audioFallbackUsed = false;
-        
-        console.log("[Audio] 🚀 Iniciando captura multi-camada - Modo:", mode, "PID:", targetPid);
-
-        const audioTest = await testAudioSystem();
-        
-        const captureStrategies = [];
-        
-        if (mode === "app" && targetPid) {
-          const processName = getProcessNameFromPid(targetPid);
-          console.log(`[Audio] 🎯 Alvo: Processo ${targetPid} (${processName})`);
-          
-          if (audioTest.systemLoopback) {
-            captureStrategies.push({
-              name: AUDIO_METHODS.PROCESS_LOOPBACK,
-              priority: 1,
-              execute: () => tryProcessLoopback(targetPid, processName)
-            });
-          }
-        }
-        
-        if (audioTest.systemLoopback) {
-          captureStrategies.push({
-            name: AUDIO_METHODS.SYSTEM_LOOPBACK,
-            priority: 2,
-            execute: () => trySystemLoopback()
-          });
-        }
-        
-        captureStrategies.push({
-          name: AUDIO_METHODS.NATIVE_BROWSER,
-          priority: 3,
-          execute: () => tryNativeCapture()
-        });
-        
-        for (const strategy of captureStrategies) {
-          console.log(`[Audio] 🔄 Tentando estratégia: ${strategy.name} (prioridade ${strategy.priority})`);
-          
-          try {
-            const result = await strategy.execute();
-            
-            if (result.success) {
-              console.log(`[Audio] ✅ Estratégia ${strategy.name} funcionou!`);
-              audioCaptureMethod = strategy.name;
-              
-              if (strategy.name === AUDIO_METHODS.NATIVE_BROWSER) {
-                audioFallbackUsed = true;
-                mainWindow.webContents.send("audio-fallback-used", { 
-                  reason: "all-advanced-methods-failed",
-                  method: AUDIO_METHODS.NATIVE_BROWSER
-                });
-              }
-              
-              return result;
-            }
-          } catch (e) {
-            console.log(`[Audio] ❌ Estratégia ${strategy.name} falhou:`, e.message);
-          }
-        }
-        
-        console.log("[Audio] ⚠️ Todas as estratégias avançadas falharam, usando captura nativa");
-        audioFallbackUsed = true;
-        mainWindow.webContents.send("audio-use-native", { reason: "all-methods-failed" });
-        
-        return { success: false, needsNative: true };
-        
-      } catch (err) {
-        console.error("[Audio] ❌ Erro geral no sistema multi-camada:", err);
-        try {
-          mainWindow.webContents.send("audio-use-native", { reason: "general-error", error: err.message });
-        } catch (e) {}
-        return { success: false, needsNative: true };
-      }
-    });
-  } catch (e) {
-    console.log("IPC start-process-audio handler not available:", e.message);
   }
 }
 
@@ -859,6 +694,89 @@ function getProcessNameFromPid(pid) {
     console.log("[Audio] Erro ao obter nome do processo:", e.message);
   }
   return "";
+}
+
+if (ipcMain && ipcMain.handle) {
+  try {
+    ipcMain.handle("start-process-audio", async (event, sourceId, mode = "system", targetPid = null) => {
+      try {
+        if (activeLoopbackCapture) {
+          try { activeLoopbackCapture.stop(); } catch (e) {}
+          activeLoopbackCapture = null;
+        }
+
+        audioCaptureMethod = null;
+        audioFallbackUsed = false;
+        
+        console.log("[Audio] 🚀 Iniciando captura - Modo:", mode, "PID:", targetPid);
+
+        const captureStrategies = [];
+        
+        if (mode === "app" && targetPid) {
+          const processName = getProcessNameFromPid(targetPid);
+          console.log(`[Audio] 🎯 Alvo: Processo ${targetPid} (${processName})`);
+          
+          captureStrategies.push({
+            name: AUDIO_METHODS.PROCESS_LOOPBACK,
+            priority: 1,
+            execute: () => tryProcessLoopback(targetPid, processName)
+          });
+        }
+        
+        captureStrategies.push({
+          name: AUDIO_METHODS.SYSTEM_LOOPBACK,
+          priority: 2,
+          execute: () => trySystemLoopback()
+        });
+        
+        captureStrategies.push({
+          name: AUDIO_METHODS.NATIVE_BROWSER,
+          priority: 3,
+          execute: () => tryNativeCapture()
+        });
+        
+        for (const strategy of captureStrategies) {
+          console.log(`[Audio] 🔄 Tentando estratégia: ${strategy.name} (prioridade ${strategy.priority})`);
+          
+          try {
+            const result = await strategy.execute();
+            
+            if (result.success) {
+              console.log(`[Audio] ✅ Estratégia ${strategy.name} funcionou!`);
+              audioCaptureMethod = strategy.name;
+              
+              if (strategy.name === AUDIO_METHODS.NATIVE_BROWSER) {
+                audioFallbackUsed = true;
+                mainWindow.webContents.send("audio-fallback-used", { 
+                  reason: "all-advanced-methods-failed",
+                  method: AUDIO_METHODS.NATIVE_BROWSER
+                });
+              }
+              
+              return result;
+            }
+          } catch (e) {
+            console.log(`[Audio] ❌ Estratégia ${strategy.name} falhou:`, e.message);
+          }
+        }
+        
+        console.log("[Audio] ⚠️ Todas as estratégias avançadas falharam, usando captura nativa");
+        audioFallbackUsed = true;
+        mainWindow.webContents.send("audio-use-native", { reason: "all-methods-failed" });
+        
+        return { success: false, needsNative: true };
+        
+      } catch (err) {
+        console.error("[Audio] ❌ Erro geral no sistema de captura:", err);
+        try {
+          mainWindow.webContents.send("audio-use-native", { reason: "general-error", error: err.message });
+        } catch (e) {}
+        return { success: false, needsNative: true };
+      }
+    });
+  } catch (e) {
+    console.log("IPC start-process-audio handler not available:", e.message);
+  }
 }
 
 if (ipcMain && ipcMain.handle) {

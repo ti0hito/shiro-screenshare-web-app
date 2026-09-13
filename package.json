@@ -18,7 +18,8 @@
     "electron-updater": "^6.3.9",
     "koffi": "^3.2.1",
     "livekit-client": "^2.22.2",
-    "loopback-capture": "^3.0.2"
+    "loopback-capture": "^3.0.2",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "electron": "^33.4.0",

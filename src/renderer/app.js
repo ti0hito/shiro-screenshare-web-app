@@ -42,7 +42,6 @@ const AppState = {
   activeVideoSender: null,
   activeSettings: null,
 
-
   // Dados da conexão
   roomName: null,
   userId: null,
@@ -263,10 +262,11 @@ async function handleStartStream() {
 
     console.log("[Shiro] Token obtido ✓");
 
-    // 2. Capturar tela
-    console.log("[Shiro] Capturando tela:", source.id);
+    // 2. Capturar tela com áudio do sistema
+    const shouldCaptureSystemAudio = audioEnabled;
+    console.log("[Shiro] Capturando tela:", source.id, "Áudio do sistema:", shouldCaptureSystemAudio);
     
-    const stream = await captureScreen(source.id, resolution, audioEnabled);
+    const stream = await captureScreen(source.id, resolution, shouldCaptureSystemAudio);
     AppState.mediaStream = stream;
     console.log("[Shiro] Tela capturada ✓");
 
@@ -294,7 +294,10 @@ async function handleStartStream() {
     // 7. Iniciar manutenção de qualidade (prevenir degradação em background)
     startQualityMaintenance();
 
-    console.log("[Shiro] 🟣 Transmissão ao vivo!");
+    console.log("[Shiro] 🟣 Transmissão ao vivo!", {
+      audioSource: "Áudio do sistema",
+      videoSource: source.name
+    });
   } catch (err) {
     console.error("[Shiro] Erro ao iniciar transmissão:", err);
     cleanupStream();
@@ -506,24 +509,40 @@ async function applyLiveStreamSettings(settings = AppState.activeSettings || Set
 
   if (!sender || typeof sender.getParameters !== "function") return;
 
-  const targetBitrateKbps = Math.min(Math.max(parseInt(settings.bitrate || "6000", 10) || 6000, 500), 9000);
+  const targetBitrateKbps = Math.min(Math.max(parseInt(settings.bitrate || "8000", 10) || 8000, 500), 20000);
   const targetFps = Math.min(Math.max(parseInt(settings.fps || "60", 10) || 60, 15), 60);
   const targetBitrateBps = targetBitrateKbps * 1000;
+  const qualityMode = settings.qualityMode || "balanced";
 
   try {
     const params = sender.getParameters();
     if (!params || !params.encodings) return;
 
+    // Definir degradationPreference baseado no modo de qualidade
+    let degradationPreference = "balanced";
+    switch (qualityMode) {
+      case "quality":
+        degradationPreference = "maintain-resolution";
+        break;
+      case "performance":
+        degradationPreference = "maintain-framerate";
+        break;
+      case "balanced":
+      default:
+        degradationPreference = "balanced";
+        break;
+    }
+
     params.encodings.forEach((enc) => {
       enc.maxBitrate = targetBitrateBps;
-      enc.minBitrate = Math.max(500000, Math.floor(targetBitrateBps * 0.5));
+      enc.minBitrate = Math.max(500000, Math.floor(targetBitrateBps * 0.3)); // Reduzido para permitir bitrate mais alto
       enc.maxFramerate = targetFps;
       enc.scaleResolutionDownBy = 1.0;
       enc.priority = "high";
-      enc.networkPriority = "high";
+      // Removidos parâmetros não suportados que causam erros no Chromium
     });
 
-    params.degradationPreference = "maintain-resolution";
+    params.degradationPreference = degradationPreference;
     await sender.setParameters(params);
     AppState.activeVideoSender = sender;
     AppState.activeSettings = settings;
@@ -531,6 +550,8 @@ async function applyLiveStreamSettings(settings = AppState.activeSettings || Set
     console.log("[Shiro] Configuração aplicada em tempo real:", {
       bitrateKbps: targetBitrateKbps,
       fps: targetFps,
+      degradationPreference: degradationPreference,
+      qualityMode: qualityMode
     });
   } catch (err) {
     console.warn("[Shiro] Não foi possível atualizar a configuração ao vivo:", err);
@@ -549,15 +570,67 @@ function startQualityMaintenance() {
   AppState.qualityMaintenanceInterval = setInterval(() => {
     if (AppState.currentScreen === "live" && AppState.activeSettings) {
       applyLiveStreamSettings(AppState.activeSettings);
+      
+      // Verificar qualidade e mostrar aviso se necessário
+      checkStreamQuality();
     }
-  }, 30000); // Reaplica a cada 30 segundos
+  }, 15000); // Reaplica a cada 15 segundos
+}
+
+/**
+ * Verifica a qualidade do stream e mostra avisos se necessário
+ */
+async function checkStreamQuality() {
+  try {
+    const stats = await getStreamStats();
+    if (!stats) return;
+
+    const qualityInfo = document.getElementById("liveQualityInfo");
+    if (!qualityInfo) return;
+
+    // Se a qualidade estiver ruim, mostrar o banner de aviso
+    if (stats.quality === "poor") {
+      qualityInfo.style.display = "block";
+      
+      // Atualizar mensagem baseada no problema
+      const messageSpan = qualityInfo.querySelector("span");
+      if (messageSpan) {
+        if (stats.bitrate < 1000000) {
+          messageSpan.textContent = "Bitrate muito baixo. Aumente o bitrate nas configurações ou verifique sua conexão de rede.";
+        } else if (stats.latency > 200) {
+          messageSpan.textContent = "Latência alta detectada. Verifique sua conexão de rede ou tente usar cabo Ethernet.";
+        } else {
+          messageSpan.textContent = "Qualidade do stream comprometida. Ajuste as configurações ou verifique sua conexão.";
+        }
+      }
+    } else if (stats.quality === "fair") {
+      // Se a qualidade for média, mostrar o banner por um tempo e depois esconder
+      qualityInfo.style.display = "block";
+      const messageSpan = qualityInfo.querySelector("span");
+      if (messageSpan) {
+        messageSpan.textContent = "Qualidade do stream moderada. Ajuste as configurações para melhor experiência.";
+      }
+      
+      // Esconder após 10 segundos
+      setTimeout(() => {
+        if (stats.quality === "fair") {
+          qualityInfo.style.display = "none";
+        }
+      }, 10000);
+    } else {
+      // Qualidade boa, esconder o banner
+      qualityInfo.style.display = "none";
+    }
+  } catch (err) {
+    console.warn("[Shiro] Erro ao verificar qualidade do stream:", err);
+  }
 }
 
 async function connectToLiveKit(token, stream, settings, resolution) {
-  // Criar room — sem adaptiveStream/dynacast para manter a qualidade exata configurada
+  // Criar room — otimizado para performance e qualidade
   const room = new Room({
-    adaptiveStream: false,
-    dynacast: false,
+    adaptiveStream: false, // Desabilitar para evitar limitação automática de bitrate
+    dynacast: false, // Desabilitar para usar bitrate máximo configurado
     videoCaptureDefaults: {
       resolution: {
         width: resolution.width,
@@ -567,6 +640,14 @@ async function connectToLiveKit(token, stream, settings, resolution) {
     },
     stopLocalVideoOnMute: false,
     stopLocalAudioOnMute: false,
+    // Configurações de rede para melhor qualidade
+    rtcConfig: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+      iceTransportPolicy: 'all',
+    },
   });
 
   AppState.room = room;
@@ -614,12 +695,13 @@ async function connectToLiveKit(token, stream, settings, resolution) {
 
     const publishOptions = {
       source: Track.Source.ScreenShare,
-      simulcast: false,
+      simulcast: settings.simulcast !== undefined ? settings.simulcast : false, // Respeitar configuração do usuário
       backupCodec: false,
       videoCodec: settings.codec || "h264",
       videoEncoding: encodingConfig,
       screenShareEncoding: encodingConfig,
-      degradationPreference: "maintain-resolution",
+      degradationPreference: "maintain-resolution", // Priorizar resolução sobre FPS
+      red: false, // Desabilitar RED para reduzir overhead
     };
 
     const pub = await room.localParticipant.publishTrack(localVideo, publishOptions);
@@ -627,7 +709,7 @@ async function connectToLiveKit(token, stream, settings, resolution) {
     AppState.activeSettings = settings;
     console.log("[Shiro] Video track publicada (H.264 / NVENC / High Res) ✓");
     
-    const minBitrateBps = Math.max(2000000, Math.floor(targetBitrateBps * 0.5));
+    const minBitrateBps = Math.max(500000, Math.floor(targetBitrateBps * 0.3));
 
     if (pub && pub.track && pub.track.sender && typeof pub.track.sender.getParameters === "function") {
       try {
@@ -640,8 +722,7 @@ async function connectToLiveKit(token, stream, settings, resolution) {
               enc.minBitrate = minBitrateBps;
               enc.maxFramerate = targetFps;
               enc.scaleResolutionDownBy = 1.0;
-              enc.networkPriority = "high";
-              enc.priority = "high";
+              // Removidos parâmetros não suportados
             });
           }
           await pub.track.sender.setParameters(params);
@@ -662,10 +743,10 @@ async function connectToLiveKit(token, stream, settings, resolution) {
   const audioTrack = stream.getAudioTracks()[0];
   if (audioTrack) {
     console.log("[Shiro] Audio track encontrado no stream:", audioTrack.id, "enabled:", audioTrack.enabled);
-    
+
     // Garantir que o track está ativado
     audioTrack.enabled = true;
-    
+
     const localAudio = new LocalAudioTrack(audioTrack);
     AppState.localAudioTrack = localAudio;
 
@@ -673,20 +754,6 @@ async function connectToLiveKit(token, stream, settings, resolution) {
       source: Track.Source.ScreenShareAudio,
     });
     console.log("[Shiro] Audio track publicada ✓");
-  } else if (AppState.processAudioStream) {
-    console.log("[Shiro] Usando áudio do processo WASAPI");
-    
-    // Criar track a partir do stream do processo
-    const processAudioTrack = AppState.processAudioStream.getAudioTracks()[0];
-    if (processAudioTrack) {
-      const localAudio = new LocalAudioTrack(processAudioTrack);
-      AppState.localAudioTrack = localAudio;
-
-      await room.localParticipant.publishTrack(localAudio, {
-        source: Track.Source.ScreenShareAudio,
-      });
-      console.log("[Shiro] Audio track do processo publicada ✓");
-    }
   } else {
     console.warn("[Shiro] Nenhum audio track encontrado na stream");
   }
@@ -783,11 +850,11 @@ async function getStreamStats() {
     AppState.previousBytesSent = currentBytesSent;
     AppState.previousStatsTime = now;
 
-    // Determinar qualidade
+    // Determinar qualidade com critérios mais refinados
     let quality = "good";
-    if (roundTripTime > 200 || bitrate < 500000) {
+    if (roundTripTime > 300 || bitrate < 1000000) {
       quality = "poor";
-    } else if (roundTripTime > 100 || bitrate < 1500000) {
+    } else if (roundTripTime > 150 || bitrate < 3000000) {
       quality = "fair";
     }
 
@@ -877,6 +944,29 @@ function showError(message) {
     errorEl.textContent = message;
   }
   showScreen("error");
+}
+
+/**
+ * Mostrar toast de aviso (non-blocking)
+ * @param {string} message
+ */
+function showWarningToast(message) {
+  // Criar elemento de toast se não existir
+  let toast = document.getElementById("warningToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "warningToast";
+    toast.className = "warning-toast";
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.classList.add("visible");
+
+  // Remover após 5 segundos
+  setTimeout(() => {
+    toast.classList.remove("visible");
+  }, 5000);
 }
 
 /**

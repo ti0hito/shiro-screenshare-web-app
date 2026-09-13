@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ── Config (BACKEND_URL, LIVEKIT_URL) ──
   getConfig: () => ipcRenderer.invoke("get-config"),
 
-  // ── Simple Audio Capture ──
-  startProcessAudio: () => ipcRenderer.invoke("start-process-audio"),
+  // ── Audio Capture ──
+  startProcessAudio: (sourceId, mode, targetPid) => ipcRenderer.invoke("start-process-audio", sourceId, mode, targetPid),
   stopProcessAudio: () => ipcRenderer.invoke("stop-process-audio")
 });

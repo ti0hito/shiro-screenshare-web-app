@@ -23,14 +23,22 @@ const LiveView = (() => {
    * @param {string} opts.guildName - Discord guild/server name
    * @param {string} opts.sourceName - Name of the captured source
    * @param {Function} opts.onStop - Callback when user clicks stop
+   * @param {string} opts.audioAppName - Name of the audio app being captured (optional)
    */
   function init(opts) {
-    const { stream, channelName, guildName, sourceName, onStop } = opts;
+    const { stream, channelName, guildName, sourceName, onStop, audioAppName } = opts;
     onStopCallback = onStop || null;
     startTime = Date.now();
 
     const container = document.getElementById("screen-live");
     if (!container) return;
+
+    const audioSourceHtml = audioAppName 
+      ? `<div class="live-audio-source">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+          <span>Áudio: ${escapeHtml(audioAppName)}</span>
+        </div>`
+      : '';
 
     container.innerHTML = `
       <div class="live-container">
@@ -43,14 +51,27 @@ const LiveView = (() => {
             <div>
               <div class="live-channel-info">${escapeHtml(channelName || sourceName || "Transmissão")}</div>
               ${guildName ? `<div class="live-channel-sub">${escapeHtml(guildName)}</div>` : ""}
+              ${audioSourceHtml}
             </div>
           </div>
           <div class="live-timer" id="liveTimer">00:00:00</div>
         </div>
 
+        <div class="live-quality-info" id="liveQualityInfo">
+          <div class="quality-info-content">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span id="qualityInfoText">Dica: Se o vídeo estiver travado ou com baixa qualidade, ajuste as configurações ou verifique sua conexão de rede.</span>
+            <button class="quality-info-close" id="btnCloseQualityInfo">×</button>
+          </div>
+        </div>
+
         <div class="live-preview">
           <video id="livePreviewVideo" autoplay muted playsinline></video>
           <div class="live-preview-label">${escapeHtml(sourceName || "Captura de tela")}</div>
+          <div class="live-network-status" id="liveNetworkStatus">
+            <span class="network-status-indicator" id="networkStatusIndicator"></span>
+            <span class="network-status-text" id="networkStatusText">Verificando...</span>
+          </div>
         </div>
 
         <div class="live-stats" id="liveStats">
@@ -120,6 +141,17 @@ const LiveView = (() => {
       settingsBtn.addEventListener("click", () => {
         if (typeof SettingsPanel !== 'undefined' && SettingsPanel.show) {
           SettingsPanel.show();
+        }
+      });
+    }
+
+    // Bind close quality info button
+    const closeQualityInfoBtn = document.getElementById("btnCloseQualityInfo");
+    if (closeQualityInfoBtn) {
+      closeQualityInfoBtn.addEventListener("click", () => {
+        const qualityInfo = document.getElementById("liveQualityInfo");
+        if (qualityInfo) {
+          qualityInfo.style.display = "none";
         }
       });
     }
@@ -198,6 +230,34 @@ const LiveView = (() => {
       const qualityText = stats.quality === "good" ? "Boa" : stats.quality === "fair" ? "Média" : "Baixa";
       qualityEl.innerHTML = `<span class="quality-indicator ${qualityClass}"></span><span class="quality-text">${qualityText}</span>`;
     }
+
+    // Atualizar indicador de status de rede
+    updateNetworkStatus(stats);
+  }
+
+  /**
+   * Update network status indicator
+   * @param {Object} stats
+   */
+  function updateNetworkStatus(stats) {
+    const indicator = document.getElementById("networkStatusIndicator");
+    const text = document.getElementById("networkStatusText");
+    
+    if (!indicator || !text) return;
+
+    let status = "good";
+    let statusText = "Conexão estável";
+
+    if (stats.latency > 200 || stats.bitrate < 1000000) {
+      status = "poor";
+      statusText = "Conexão instável";
+    } else if (stats.latency > 100 || stats.bitrate < 3000000) {
+      status = "fair";
+      statusText = "Conexão moderada";
+    }
+
+    indicator.className = `network-status-indicator ${status}`;
+    text.textContent = statusText;
   }
 
   /**

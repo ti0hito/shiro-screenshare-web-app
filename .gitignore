@@ -12,6 +12,8 @@ build/
 backend/
 scripts/
 .github/
+VIDEO_QUALITY_IMPROVEMENTS.md
+PION_MIGRATION_GUIDE.md
 
 # esbuild bundle (regenerated on build)
 src/renderer/app.bundle.js

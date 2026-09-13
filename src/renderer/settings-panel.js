@@ -7,13 +7,21 @@ const SettingsPanel = (() => {
   const STORAGE_KEY = "shiro-settings";
 
   const PRESETS = {
+    ultra: {
+      name: "Ultra Performance",
+      emoji: "⚡",
+      desc: "720p 60FPS (Baixa latência)",
+      res: "720",
+      fps: "60",
+      bit: "8000",
+    },
     gamer: {
       name: "Gamer",
       emoji: "🚀",
       desc: "1080p 60FPS",
       res: "1080",
       fps: "60",
-      bit: "6000",
+      bit: "10000",
     },
     gamer720: {
       name: "Gamer Leve",
@@ -21,7 +29,7 @@ const SettingsPanel = (() => {
       desc: "720p 60FPS",
       res: "720",
       fps: "60",
-      bit: "4000",
+      bit: "6000",
     },
     balanced: {
       name: "Equilibrado",
@@ -29,7 +37,7 @@ const SettingsPanel = (() => {
       desc: "1080p 30FPS",
       res: "1080",
       fps: "30",
-      bit: "4000",
+      bit: "6000",
     },
     max: {
       name: "Alta Qualidade",
@@ -37,7 +45,7 @@ const SettingsPanel = (() => {
       desc: "1440p 60FPS",
       res: "1440",
       fps: "60",
-      bit: "9000",
+      bit: "15000",
     },
     economy: {
       name: "Economia",
@@ -45,21 +53,38 @@ const SettingsPanel = (() => {
       desc: "480p 30FPS",
       res: "480",
       fps: "30",
-      bit: "1500",
+      bit: "2000",
+    },
+    streaming: {
+      name: "Streaming",
+      emoji: "📺",
+      desc: "1080p 30FPS (Otimizado)",
+      res: "1080",
+      fps: "30",
+      bit: "8000",
+    },
+    presentation: {
+      name: "Apresentação",
+      emoji: "📊",
+      desc: "1440p 30FPS (Alta res)",
+      res: "1440",
+      fps: "30",
+      bit: "12000",
     },
   };
 
   let settings = {
-    preset: "gamer",
-    resolution: "1080",
-    customWidth: "1920",
-    customHeight: "1080",
+    preset: "ultra",
+    resolution: "720",
+    customWidth: "1280",
+    customHeight: "720",
     fps: "60",
-    bitrate: "6000",
+    bitrate: "8000",
     codec: "h264",
     hwAccel: true,
     simulcast: false,
     isolateAudio: false,
+    qualityMode: "balanced",
   };
 
   function sanitizeNumber(value, fallback, min, max) {
@@ -71,9 +96,9 @@ const SettingsPanel = (() => {
 
   function clampSafeSettings() {
     settings.fps = sanitizeNumber(settings.fps, "60", 15, 60);
-    settings.bitrate = sanitizeNumber(settings.bitrate, "6000", 500, 9000);
-    settings.customWidth = sanitizeNumber(settings.customWidth, "1920", 480, 3840);
-    settings.customHeight = sanitizeNumber(settings.customHeight, "1080", 360, 2160);
+    settings.bitrate = sanitizeNumber(settings.bitrate, "8000", 500, 20000);
+    settings.customWidth = sanitizeNumber(settings.customWidth, "1280", 480, 3840);
+    settings.customHeight = sanitizeNumber(settings.customHeight, "720", 360, 2160);
   }
 
   function getQualitySummary() {
@@ -172,6 +197,11 @@ const SettingsPanel = (() => {
       <div class="settings-section">
         <div class="settings-section-title">Qualidade de Vídeo</div>
 
+        <div class="settings-info-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>A qualidade depende da sua conexão de rede. Use o perfil "Gamer" para jogos ou "Alta Qualidade" para conteúdo estático.</span>
+        </div>
+
         <div class="settings-option settings-option-stack">
           <div class="settings-option-head">
             <label>Resolução</label>
@@ -200,18 +230,18 @@ const SettingsPanel = (() => {
             <label>Taxa de Quadros</label>
             <input id="settingFps" type="number" min="15" max="60" step="5" value="${settings.fps || "60"}" />
           </div>
-          <div class="settings-help-text">Limite fixo: 60 FPS máximo.</div>
+          <div class="settings-help-text">60 FPS para movimento suave, 30 FPS para economia de banda.</div>
         </div>
 
         <div class="settings-option settings-option-stack">
           <div class="settings-option-head">
             <label>Bitrate</label>
             <div class="settings-bitrate-input">
-              <input id="settingBitrate" type="number" min="500" max="9000" step="250" value="${settings.bitrate || "6000"}" />
+              <input id="settingBitrate" type="number" min="500" max="20000" step="250" value="${settings.bitrate || "8000"}" />
               <span>kbps</span>
             </div>
           </div>
-          <div class="settings-help-text">Limite fixo: 9000 kbps máximo. Resumo ativo: ${getQualitySummary()}</div>
+          <div class="settings-help-text">Maior bitrate = melhor qualidade, mas exige mais banda. Recomendado: 8000-15000 kbps.</div>
         </div>
       </div>
 
@@ -250,6 +280,15 @@ const SettingsPanel = (() => {
             <label for="settingSimulcast" class="toggle-slider"></label>
           </div>
         </div>
+
+        <div class="settings-option">
+          <label>Modo de Qualidade</label>
+          <select id="settingQualityMode">
+            <option value="balanced" ${settings.qualityMode === "balanced" ? "selected" : ""}>Equilibrado</option>
+            <option value="quality" ${settings.qualityMode === "quality" ? "selected" : ""}>Priorizar Qualidade</option>
+            <option value="performance" ${settings.qualityMode === "performance" ? "selected" : ""}>Priorizar Performance</option>
+          </select>
+        </div>
       </div>
     `;
 
@@ -284,6 +323,7 @@ const SettingsPanel = (() => {
     const hwEl = document.getElementById("settingHwAccel");
     const simEl = document.getElementById("settingSimulcast");
     const isoEl = document.getElementById("settingIsolateAudio");
+    const qualityModeEl = document.getElementById("settingQualityMode");
 
     if (resEl) resEl.addEventListener("change", (e) => {
       settings.resolution = e.target.value;
@@ -300,7 +340,7 @@ const SettingsPanel = (() => {
       renderPanel();
     });
     if (bitEl) bitEl.addEventListener("input", (e) => {
-      settings.bitrate = sanitizeNumber(e.target.value, "6000", 500, 9000);
+      settings.bitrate = sanitizeNumber(e.target.value, "8000", 500, 20000);
       saveToStorage();
       renderPanel();
     });
@@ -320,6 +360,11 @@ const SettingsPanel = (() => {
     if (hwEl) hwEl.addEventListener("change", (e) => { settings.hwAccel = e.target.checked; saveToStorage(); });
     if (simEl) simEl.addEventListener("change", (e) => { settings.simulcast = e.target.checked; saveToStorage(); });
     if (isoEl) isoEl.addEventListener("change", (e) => { settings.isolateAudio = e.target.checked; saveToStorage(); });
+    if (qualityModeEl) qualityModeEl.addEventListener("change", (e) => { 
+      settings.qualityMode = e.target.value; 
+      applyQualityMode(e.target.value);
+      saveToStorage(); 
+    });
   }
 
   /**
@@ -347,6 +392,26 @@ const SettingsPanel = (() => {
     settings.bitrate = p.bit;
     saveToStorage();
     renderPanel();
+  }
+
+  /**
+   * Aplica configurações baseadas no modo de qualidade
+   * @param {string} mode - "balanced", "quality", "performance"
+   */
+  function applyQualityMode(mode) {
+    switch (mode) {
+      case "quality":
+        // Priorizar qualidade: manter resolução, sacrificar FPS se necessário
+        // Ajuste automático de degradationPreference será feito no app.js
+        break;
+      case "performance":
+        // Priorizar performance: manter FPS, sacrificar resolução se necessário
+        break;
+      case "balanced":
+      default:
+        // Equilibrado: balancear entre FPS e resolução
+        break;
+    }
   }
 
   /**
